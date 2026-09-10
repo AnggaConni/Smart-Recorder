@@ -1,25 +1,34 @@
 const CACHE_VERSION = "smartmom-v1";
+
 const APP_CACHE = `${CACHE_VERSION}-app`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
+const BASE = "/Smart-Recorder/";
+
 const APP_SHELL = [
-  "/recorder/",
-  "/recorder/index.html",
-  "/recorder/manifest.json",
-  "/recorder/icons/icon-192.png",
-  "/recorder/icons/icon-512.png"
+  BASE,
+  `${BASE}index.html`,
+  `${BASE}manifest.json`,
+  `${BASE}thumbnail.png`,
+  `${BASE}icons/icon-192.png`,
+  `${BASE}icons/icon-512.png`
 ];
+
 
 /* =========================================================
    INSTALL
    ========================================================= */
 
 self.addEventListener("install", event => {
+
   event.waitUntil(
+
     caches.open(APP_CACHE)
       .then(cache => cache.addAll(APP_SHELL))
       .then(() => self.skipWaiting())
+
   );
+
 });
 
 
@@ -28,33 +37,40 @@ self.addEventListener("install", event => {
    ========================================================= */
 
 self.addEventListener("activate", event => {
+
   event.waitUntil(
+
     caches.keys()
-      .then(keys =>
-        Promise.all(
+      .then(keys => {
+
+        return Promise.all(
+
           keys
             .filter(key =>
               key !== APP_CACHE &&
               key !== RUNTIME_CACHE
             )
             .map(key => caches.delete(key))
-        )
-      )
+
+        );
+
+      })
       .then(() => self.clients.claim())
+
   );
+
 });
 
 
 /* =========================================================
    FETCH
-   ONLINE FIRST
+   ONLINE FIRST → OFFLINE FALLBACK
    ========================================================= */
 
 self.addEventListener("fetch", event => {
 
   const request = event.request;
 
-  /* hanya GET */
   if (request.method !== "GET") {
     return;
   }
@@ -62,10 +78,7 @@ self.addEventListener("fetch", event => {
   const url = new URL(request.url);
 
   /*
-   Jangan intercept:
-   - Gemini API
-   - API endpoint eksternal
-   - analytics
+   * Jangan intercept Gemini / external AI API.
    */
 
   if (
@@ -75,14 +88,26 @@ self.addEventListener("fetch", event => {
     return;
   }
 
+  /*
+   * Hanya handle aplikasi kita.
+   */
+
+  if (!url.pathname.startsWith(BASE)) {
+    return;
+  }
+
+
   event.respondWith(
+
     fetch(request)
+
       .then(response => {
 
         /*
-         Simpan hanya response valid.
-         Clone karena response hanya bisa dibaca sekali.
-        */
+         * ONLINE:
+         * gunakan versi server terbaru
+         * sekaligus update runtime cache.
+         */
 
         if (
           response &&
@@ -90,23 +115,26 @@ self.addEventListener("fetch", event => {
           response.type !== "opaque"
         ) {
 
-          const clone = response.clone();
+          const copy = response.clone();
 
           caches.open(RUNTIME_CACHE)
             .then(cache => {
-              cache.put(request, clone);
+              cache.put(request, copy);
             })
             .catch(() => {});
+
         }
 
         return response;
+
       })
+
       .catch(() => {
 
         /*
-         INTERNET GAGAL
-         → ambil dari cache
-        */
+         * OFFLINE:
+         * gunakan cache.
+         */
 
         return caches.match(request)
           .then(cached => {
@@ -116,16 +144,20 @@ self.addEventListener("fetch", event => {
             }
 
             /*
-             Untuk navigation request,
-             fallback ke app shell.
-            */
+             * Jika membuka halaman ketika offline,
+             * kembalikan app shell.
+             */
 
             if (request.mode === "navigate") {
-              return caches.match("/recorder/");
+
+              return caches.match(
+                `${BASE}index.html`
+              );
+
             }
 
             return new Response(
-              "Offline resource unavailable",
+              "Offline — resource not available.",
               {
                 status: 503,
                 headers: {
@@ -137,12 +169,14 @@ self.addEventListener("fetch", event => {
           });
 
       })
+
   );
+
 });
 
 
 /* =========================================================
-   MESSAGE
+   UPDATE CONTROL
    ========================================================= */
 
 self.addEventListener("message", event => {
