@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Smart MoM Studio — Offline Recorder + AI Minutes</title>
 
+<!-- Smart MoM Studio — SVG Favicon -->
+<link
+  rel="icon"
+  href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%232563eb'/%3E%3Cstop offset='1' stop-color='%2306b6d4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='15' fill='url(%23g)'/%3E%3Crect x='23' y='12' width='18' height='28' rx='9' fill='white'/%3E%3Cpath d='M17 31a15 15 0 0 0 30 0M32 46v7M25 53h14' fill='none' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M11 22v4M7 24v2M53 22v4M57 24v2' stroke='%23a7f3d0' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E"
+  type="image/svg+xml"
+>
+
 <script src="https://cdn.tailwindcss.com?plugins=typography,forms"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -18,14 +25,66 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Smart MoM">
 
-<link rel="manifest" href="/recorder/manifest.json">
-<meta name="theme-color" content="#2563eb">
+<link
+  rel="manifest"
+  href="/Smart-Recorder/manifest.json"
+>
 
-<link rel="apple-touch-icon" href="/recorder/icons/icon-192.png">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Smart MoM">
+<meta
+  name="theme-color"
+  content="#2563eb"
+>
+
+<meta
+  property="og:image"
+  content="https://anggaconni.github.io/Smart-Recorder/thumbnail.png"
+>
+
+<meta
+  property="og:image:alt"
+  content="Smart MoM Studio — AI Meeting Assistant"
+>
+
+<meta
+  property="og:title"
+  content="Smart MoM Studio — AI Meeting Assistant"
+>
+
+<meta
+  property="og:description"
+  content="Record, transcribe, summarize and turn conversations into action — with bilingual English and Indonesian support."
+>
+
+<meta
+  property="og:type"
+  content="website"
+>
+
+<meta
+  property="og:url"
+  content="https://anggaconni.github.io/Smart-Recorder/"
+>
+
+
+<meta
+  name="twitter:card"
+  content="summary_large_image"
+>
+
+<meta
+  name="twitter:title"
+  content="Smart MoM Studio — AI Meeting Assistant"
+>
+
+<meta
+  name="twitter:description"
+  content="Record, transcribe, summarize and turn conversations into action."
+>
+
+<meta
+  name="twitter:image"
+  content="https://anggaconni.github.io/Smart-Recorder/thumbnail.png"
+>
 
 <script>
 tailwind.config = {
@@ -1937,97 +1996,83 @@ function hydrateInputs(){
 
 
 <script>
-(function registerSmartMoMServiceWorker() {
-
-  if (!("serviceWorker" in navigator)) {
-    console.warn("Service Worker tidak didukung browser ini.");
-    return;
-  }
+if ("serviceWorker" in navigator) {
 
   window.addEventListener("load", function () {
 
     navigator.serviceWorker
-      .register("/recorder/sw.js", {
-        scope: "/recorder/"
+      .register("/Smart-Recorder/sw.js", {
+        scope: "/Smart-Recorder/"
       })
       .then(function (registration) {
 
         console.log(
-          "Smart MoM Service Worker registered:",
+          "✓ Smart MoM Service Worker:",
           registration.scope
         );
 
-        /*
-         * Kalau ada update service worker
-         */
-        registration.addEventListener("updatefound", function () {
+        registration.addEventListener(
+          "updatefound",
+          function () {
 
-          const newWorker = registration.installing;
+            const worker = registration.installing;
 
-          if (!newWorker) return;
+            if (!worker) return;
 
-          newWorker.addEventListener("statechange", function () {
+            worker.addEventListener(
+              "statechange",
+              function () {
 
-            if (
-              newWorker.state === "installed" &&
-              navigator.serviceWorker.controller
-            ) {
+                if (
+                  worker.state === "installed" &&
+                  navigator.serviceWorker.controller
+                ) {
 
-              console.log("New Smart MoM version available.");
+                  console.log(
+                    "New Smart MoM version available."
+                  );
 
-              /*
-               * Bisa diganti dengan toast custom Anda
-               */
-              const shouldUpdate = confirm(
-                "Versi baru Smart MoM tersedia. Muat ulang sekarang?"
-              );
+                  worker.postMessage({
+                    type: "SKIP_WAITING"
+                  });
 
-              if (shouldUpdate) {
-
-                newWorker.postMessage({
-                  type: "SKIP_WAITING"
-                });
+                }
 
               }
+            );
 
-            }
-
-          });
-
-        });
+          }
+        );
 
       })
       .catch(function (error) {
+
         console.error(
-          "Smart MoM Service Worker registration failed:",
+          "Smart MoM SW registration failed:",
           error
         );
+
       });
+
+
+    let refreshing = false;
+
+    navigator.serviceWorker.addEventListener(
+      "controllerchange",
+      function () {
+
+        if (refreshing) return;
+
+        refreshing = true;
+
+        window.location.reload();
+
+      }
+    );
 
   });
 
-
-  /*
-   * Setelah service worker baru aktif,
-   * reload supaya UI menggunakan versi terbaru.
-   */
-
-  let refreshing = false;
-
-  navigator.serviceWorker.addEventListener(
-    "controllerchange",
-    function () {
-
-      if (refreshing) return;
-
-      refreshing = true;
-
-      window.location.reload();
-
-    }
-  );
-
-})();
+}
 </script>
 
 
