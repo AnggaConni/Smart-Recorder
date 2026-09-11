@@ -2273,23 +2273,19 @@ async function getMixedAudioStream() {
   }
 
   // Cek apakah tombol "Suara Komputer" (System Audio) dihidupkan di UI
-  if ($('opt-system-audio') && $('opt-system-audio').checked) {
-    try {
-      const sysStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-      streams.push({ stream: sysStream, label: 'Screen/System Audio' });
-    } catch (e) {
-      console.warn("Perekaman suara layar dibatalkan.");
-      $('opt-system-audio').checked = false; // Matikan centang otomatis jika user membatalkan popup Chrome
-    }
+  if ($('opt-system-audio') && $('opt-system-audio').checked && window.sysAudioStream) {
+    // Gunakan stream yang sudah diizinkan saat klik centang
+    streams.push({ stream: window.sysAudioStream, label: 'Screen/System Audio' });
   }
 
   dest.stream.originalTracks = []; 
   
   streams.forEach(item => {
     item.stream.getTracks().forEach(t => {
-      // Hentikan track video segera agar tidak memakan RAM (kita hanya butuh audio)
-      if (t.kind === 'video') t.stop(); 
-      else dest.stream.originalTracks.push(t); 
+      // Jangan di-stop, karena mematikan video akan memutus screen sharing di Chrome. Kita disable saja agar hemat CPU.
+      if (t.kind === 'video') t.enabled = false; 
+      
+      dest.stream.originalTracks.push(t); 
     });
     
     if (item.stream.getAudioTracks().length > 0) {
@@ -2385,6 +2381,8 @@ async function hardStop(){
   $('btn-record').style.background = ''; $('btn-record').style.borderColor = '';
   $('btn-pause').disabled = true; $('btn-stop').disabled = true;
   $('btn-pause').innerHTML = '<i class="fa-solid fa-pause"></i>';
+  $('opt-system-audio').checked = false;
+  window.sysAudioStream = null;
   setStatus('stopped');
   logEngine('session stopped');
 
@@ -2488,6 +2486,33 @@ $('opt-multi-mic').addEventListener('change', async function(){
     }
   } else {
     state.selectedMics = []; 
+  }
+});
+
+$('opt-system-audio').addEventListener('change', async function(){
+  if(this.checked) {
+    try {
+      // Langsung minta izin saat dicentang
+      window.sysAudioStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      
+      // Jika user menekan tombol "Stop sharing" bawaan Chrome
+      window.sysAudioStream.getVideoTracks()[0].onended = function() {
+        $('opt-system-audio').checked = false;
+        if(window.sysAudioStream) {
+          window.sysAudioStream.getTracks().forEach(t => t.stop());
+          window.sysAudioStream = null;
+        }
+      };
+    } catch(e) {
+      console.warn("Berbagi layar dibatalkan.");
+      this.checked = false; // Batal centang otomatis
+    }
+  } else {
+    // Matikan stream jika user menghapus centang manual
+    if(window.sysAudioStream) {
+      window.sysAudioStream.getTracks().forEach(t => t.stop());
+      window.sysAudioStream = null;
+    }
   }
 });
 
